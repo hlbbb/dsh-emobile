@@ -1,0 +1,23 @@
+node_modules/
+Python/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+
+# 凭证 / 个人信息 / 运行数据（绝不入库）
+.env
+.env.*
+*.env
+config.json
+credentials*
+*账号密码*
+OA账号密码.env
+*.db
+*.sqlite
+*.sqlite3
+*.jsonl
+sessions/
+.runtime/
+dist/
+*.token

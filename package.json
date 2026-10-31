@@ -1,0 +1,44 @@
+{
+  "name": "dsh-emobile",
+  "version": "0.1.0",
+  "description": "DSH 插件：把 E-Mobile(泛微) 能力接成 Agent Tools，随包内置 emcli Python 源码与依赖，目标机只要有 Python 即可开箱即用",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "vendor",
+    "!vendor/**/__pycache__",
+    "!vendor/**/*.pyc",
+    "cordis.patch.yml",
+    "README.md",
+    "INSTALL.md",
+    "tools"
+  ],
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "emobile",
+    "emcli",
+    "weaver"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-tools": "*",
+    "@deepseek-ai/schemastery": "*"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "name": "emobile-cli",
+  "package": "cli-anything-e-mobile",
+  "version": "1.0.0",
+  "entrypoints": ["emcli", "cli-anything-e-mobile", "python -m cli_anything_e_mobile"],
+  "platform": "windows",
+  "python": ">=3.10",
+  "global_options": {
+    "json": {"flag": "--json", "note": "全局选项，必须放在子命令之前；错误 JSON 也写 stdout"},
+    "cdp_port": "--cdp-port",
+    "quiet": "--quiet",
+    "verbose": "--verbose",
+    "show_identity": "--show-identity",
+    "version": "--version"
+  },
+  "data_channels": {
+    "login_state": "CDP(9333/9334/9335/9222/9223) -> 磁盘 LevelDB(%APPDATA%\\E-Mobile\\Local Storage\\leveldb)，读类不需要调试端口",
+    "rest": "{base_url}/emp/**  头 access_token/emaccesstk",
+    "xmpp": "TCP 5222 或 WebSocket 7070(子协议 xmpp)，SCRAM-SHA-1",
+    "gui": "CDP 驱动 E-Mobile 官方客户端(Quill DOM)，仅发送类使用",
+    "localdb": "sqlite3 em7.db 只读(mode=ro&immutable=1)，7.1.4 不生成"
+  },
+  "exit_codes": {
+    "0": "成功",
+    "1": "一般错误",
+    "2": "发送被白名单拦下(blocked=true)"
+  },
+  "commands": [
+    {"name": "status", "group": "core", "args": ["--probe"], "channel": "local/rest/xmpp", "needs_cdp": false, "write": false, "json_has_ok": false, "note": "输出配置摘要字段，无 ok 字段"},
+    {"name": "compat", "group": "core", "args": ["--probe"], "channel": "local/rest/xmpp/gui", "needs_cdp": false, "write": false, "json_has_ok": true, "note": "只读诊断，失败不影响退出码"},
+    {"name": "setup", "group": "core", "args": ["--no-launch", "--no-launcher", "--wait-login"], "channel": "process/cdp", "needs_cdp": "conditional", "write": true, "note": "可能关闭/重启客户端；配置快捷方式"},
+    {"name": "launcher show", "group": "launcher", "args": [], "channel": "filesystem", "needs_cdp": false, "write": false},
+    {"name": "launcher install", "group": "launcher", "args": ["--port"], "channel": "filesystem", "needs_cdp": false, "write": true, "note": "改快捷方式；改动前备份"},
+    {"name": "launcher remove", "group": "launcher", "args": ["--port"], "channel": "filesystem", "needs_cdp": false, "write": true, "note": "回滚；本工具建的启动器走回收站"},
+    {"name": "token refresh", "group": "token", "args": ["--force"], "channel": "login_state/rest", "needs_cdp": false, "write": true},
+    {"name": "token set", "group": "token", "args": ["<access_token>", "--base-url"], "channel": "config", "needs_cdp": false, "write": true},
+    {"name": "token clear", "group": "token", "args": [], "channel": "config", "needs_cdp": false, "write": true},
+    {"name": "config show", "group": "config", "args": [], "channel": "config", "needs_cdp": false, "write": false, "json_has_ok": false},
+    {"name": "config set", "group": "config", "args": ["<key>", "<value>"], "channel": "config", "needs_cdp": false, "write": true, "note": "key 仅 transport|proxy|resource"},
+    {"name": "login", "group": "login", "args": ["--env-file", "--code", "--attempts", "--timeout", "--ocr-models", "--force", "--no-launch"], "channel": "cdp-login/ocr", "needs_cdp": true, "write": true},
+    {"name": "login status", "group": "login", "args": [], "channel": "rest/login_state", "needs_cdp": false, "write": false, "json_has_ok": true},
+    {"name": "login init", "group": "login", "args": ["--env-file", "--account", "--password", "--force"], "channel": "filesystem", "needs_cdp": false, "write": true},
+    {"name": "login protect", "group": "login", "args": ["--env-file", "--yes"], "channel": "filesystem/dpapi", "needs_cdp": false, "write": true},
+    {"name": "chat list", "group": "chat", "args": ["-n/--limit", "--unread", "--name"], "channel": "xmpp", "needs_cdp": false, "write": false, "json_has_ok": true, "json_shape": "{ok,count,total,conversations:[{id,type,name,unread,last,time,top}]}"},
+    {"name": "chat history", "group": "chat", "args": ["<conversation>", "-n/--limit", "--before"], "channel": "xmpp", "needs_cdp": false, "write": false, "json_has_ok": true, "json_shape": "{ok,conversation,count,messages:[{msgid,sender,sender_name,time,type,content}],next_cursor}"},
+    {"name": "chat send", "group": "chat", "args": ["<conversation>", "<text>", "--id", "--dry-run", "--yes"], "channel": "xmpp", "needs_cdp": false, "write": true, "available": false, "note": "自拼 XMPP 文本被服务端静默丢弃，仅 dry-run 有用"},
+    {"name": "chat send-file", "group": "chat", "args": ["<conversation>", "<file>", "--yes", "--attempts", "--interval", "--first-delay", "--no-wait", "--no-open"], "channel": "gui", "needs_cdp": true, "write": true, "json_has_ok": true, "note": "群可用；单聊服务端不收；有落地复核"},
+    {"name": "chat send-image", "group": "chat", "args": ["<conversation>", "<file>", "--yes", "--wait", "--no-open"], "channel": "gui", "needs_cdp": true, "write": true, "json_has_ok": true, "note": "图片消息；默认 8MB 上限"},
+    {"name": "chat send-gui", "group": "chat", "args": ["<conversation>", "[text]", "--text-file", "--yes", "--no-open"], "channel": "gui", "needs_cdp": true, "write": true, "json_has_ok": true, "note": "多行文本用 --text-file"},
+    {"name": "chat watch", "group": "chat", "args": ["--seconds", "--from", "--no-receipt"], "channel": "xmpp", "needs_cdp": false, "write": false, "json_has_ok": true},
+    {"name": "policy show", "group": "policy", "args": [], "channel": "config", "needs_cdp": false, "write": false, "json_has_ok": true},
+    {"name": "policy add", "group": "policy", "args": ["<conversation>", "--force"], "channel": "config", "needs_cdp": false, "write": true},
+    {"name": "policy remove", "group": "policy", "args": ["<conversation>"], "channel": "config", "needs_cdp": false, "write": true},
+    {"name": "policy clear", "group": "policy", "args": [], "channel": "config", "needs_cdp": false, "write": true},
+    {"name": "contact search", "group": "contact", "args": ["<keyword>", "-n/--limit", "--simple"], "channel": "rest", "needs_cdp": false, "write": false, "json_has_ok": true, "json_shape": "{ok,count,users:[{id,name,dept,position,state,mobile(masked)}]}"},
+    {"name": "group list", "group": "group", "args": ["-n/--limit"], "channel": "rest", "needs_cdp": false, "write": false, "json_has_ok": true},
+    {"name": "ding list", "group": "ding", "args": ["-n/--limit"], "channel": "xmpp", "needs_cdp": false, "write": false, "json_has_ok": true},
+    {"name": "db overview", "group": "db", "args": [], "channel": "localdb", "needs_cdp": false, "write": false, "version_note": "7.1.4 不可用(无 em7.db)", "json_has_ok": true},
+    {"name": "db urls", "group": "db", "args": [], "channel": "localdb", "needs_cdp": false, "write": false, "json_has_ok": true},
+    {"name": "db users", "group": "db", "args": [], "channel": "localdb", "needs_cdp": false, "write": false, "json_has_ok": true, "note": "显式原始数据，baseUserId 不掩码"},
+    {"name": "db items", "group": "db", "args": ["--type", "--key", "-n/--limit", "--value"], "channel": "localdb", "needs_cdp": false, "write": false, "json_has_ok": true},
+    {"name": "db chatlist", "group": "db", "args": [], "channel": "localdb", "needs_cdp": false, "write": false, "json_has_ok": true},
+    {"name": "repl", "group": "interactive", "args": [], "channel": "mixed", "needs_cdp": false, "write": true}
+  ],
+  "env_vars": [
+    "EMCLI_EMOBILE_EXE", "EMCLI_CDP_PORT", "EMCLI_CLIENT_VERSION", "EMCLI_PROXY",
+    "EMCLI_TRANSPORT", "EMCLI_LOGIN_ENV", "EMCLI_NO_RESTART", "EMCLI_NO_FORCE",
+    "EMCLI_EMOBILE_USERDATA", "EMCLI_LAUNCHER_DIR", "EMCLI_BACKUP_DIR",
+    "EMCLI_EMOBILE_LNK", "EMCLI_MAX_IMAGE_BYTES"
+  ],
+  "files": {
+    "config": "%LOCALAPPDATA%\\emcli\\config.json",
+    "credential_candidates": ["--env-file", "$EMCLI_LOGIN_ENV", "config.login_env_file", "cwd", "parent dirs(<=6)", "%LOCALAPPDATA%\\emcli"],
+    "login_state": "%APPDATA%\\E-Mobile\\Local Storage\\leveldb",
+    "local_db": "%APPDATA%\\E-Mobile\\sqlite3\\em7.db",
+    "launcher_backup": "%LOCALAPPDATA%\\emcli\\backup\\"
+  },
+  "dependencies": {
+    "required": ["click>=8.0", "requests>=2.28", "websocket-client>=1.6"],
+    "windows_required": ["psutil>=5.9", "pywin32>=306"],
+    "optional": ["ddddocr>=1.4 (验证码识别)"],
+    "dev": ["pytest>=7"]
+  },
+  "safety": {
+    "send_requires_allowlist": true,
+    "send_requires_confirmation_or_yes": true,
+    "default_allowlist_empty": true,
+    "blocked_exit_code": 2,
+    "masked_surfaces": ["status", "login", "login status", "setup", "config show", "compat", "--probe", "--verbose", "chat send --dry-run"],
+    "raw_data_surfaces": ["chat list id", "chat history conversation.id", "send results", "policy show", "db users", "db items --value", "contact search"]
+  },
+  "limitations": [
+    "chat send(XMPP) 服务端丢弃，文本必须 send-gui",
+    "发送类需要 GUI 登录态与调试端口，不能纯 headless",
+    "单聊发送服务端不收(private_chat:0)，群发送正常",
+    "图片必须 send-image，send-file 拖放 image 会被拒；默认 8MB 上限",
+    "多行文本必须 --text-file",
+    "GUI DOM 仅 7.2.6 验证，7.1.4 发送类未实测",
+    "7.1.4 无 em7.db，db * 不可用",
+    "自动登入验证码识别非 100%，--code 兜底",
+    "强杀客户端会丢未发送草稿",
+    "应用推送会话(a_)无历史",
+    "文件上传耗时与大小相关(21MB~4分钟)"
+  ],
+  "plugin_tools_recommended": [
+    {"tool": "emobile_status", "command": "--json status --probe", "kind": "read"},
+    {"tool": "emobile_compat", "command": "--json compat", "kind": "read"},
+    {"tool": "emobile_list_conversations", "command": "--json chat list", "kind": "read"},
+    {"tool": "emobile_chat_history", "command": "--json chat history", "kind": "read"},
+    {"tool": "emobile_search_contact", "command": "--json contact search", "kind": "read"},
+    {"tool": "emobile_list_groups", "command": "--json group list", "kind": "read"},
+    {"tool": "emobile_ding_list", "command": "--json ding list", "kind": "read"},
+    {"tool": "emobile_send_text", "command": "--json chat send-gui --yes --text-file", "kind": "write-restricted"},
+    {"tool": "emobile_send_file", "command": "--json chat send-file --yes", "kind": "write-restricted"},
+    {"tool": "emobile_send_image", "command": "--json chat send-image --yes", "kind": "write-restricted"},
+    {"tool": "emobile_policy_show", "command": "--json policy show", "kind": "read"}
+  ]
+}
