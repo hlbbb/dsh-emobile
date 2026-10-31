@@ -23,7 +23,7 @@ DSH 插件 (host)
 - 只读能力（会话/历史/搜人/群/必达/状态）只需要 Python；发送类仍依赖 E-Mobile 客户端 GUI 与调试端口。
 - 若目标机已装 `emcli` 且想优先用它：配置 `emcliPath` 或 `pythonPath`（此时跳过内置运行时）。
 
-## 工具清单（13）
+## 工具清单（16）
 
 | 工具 | 类型 | 说明 |
 |---|---|---|
@@ -37,6 +37,9 @@ DSH 插件 (host)
 | `emobile_ding_list` | 只读 | 必达列表 |
 | `emobile_policy_show` | 只读 | 发送白名单 |
 | `emobile_login_status` | 只读 | 是否需要重新登录 |
+| `emobile_setup` | 控制 | 初始化/修复：端口就绪，必要时拉起/重启客户端 |
+| `emobile_login` | 控制 | 会话失效自动重登（账号密码+验证码 OCR） |
+| `emobile_token_refresh` | 控制 | 从客户端重读 token/IM 参数 |
 | `emobile_send_text` | 写（受限） | 发文本（仅群） |
 | `emobile_send_file` | 写（受限） | 发文件（仅群） |
 | `emobile_send_image` | 写（受限） | 发图片（仅群） |
@@ -51,6 +54,10 @@ DSH 插件 (host)
 | `emcliPath` | `''` | 可选：已有 emcli.exe 绝对路径（最高优先级） |
 | `pythonPath` | `''` | 可选：已有 Python 解释器绝对路径（Anaconda 亦可） |
 | `allowSend` | `false` | 是否允许发送类工具 |
+| `allowControl` | `true` | 是否允许 setup/login/token_refresh 控制类工具 |
+| `ocrEnabled` | `true` | 是否允许首次登录自动安装/使用 ddddocr |
+| `pipIndexUrl` / `pipExtraIndexUrl` | `''` | 在线安装 OCR 的 PyPI 索引（可填国内镜像） |
+| `ocrTimeoutMs` | `900000` | 首次安装 OCR 超时 |
 | `requestTimeoutMs` | `60000` | 只读类超时 |
 | `sendTimeoutMs` | `600000` | 发送类超时 |
 | `probeTimeoutMs` | `15000` | 探测超时 |
@@ -70,7 +77,7 @@ DSH 插件 (host)
 ## 验证
 
 ```powershell
-npm test                       # 41 项单测（含真实干净 venv 离线装配 E2E）
+npm test                       # 45 项单测（含真实干净 venv 离线装配 E2E）
 node tools\probe-real.mjs      # 用内置运行时真实跑 status / policy show
 node tools\install-to-profile.mjs --doctor
 ```
@@ -80,7 +87,7 @@ node tools\install-to-profile.mjs --doctor
 ## 已知限制
 
 - 发送类需 E-Mobile 客户端图形界面登录态 + 调试端口（emcli 会自动兜底）。
-- 内置 wheel 不含验证码 OCR（ddddocr 体积大）；如需要客户端自动登录，可在目标机 `pip install dddocr` 或配置已有 emcli。
+- 验证码 OCR **不随主包内置**：首次 `emobile_login` 时按目标机**本地 Python 版本**在线安装 `ddddocr`（约 150MB，装到插件私有目录，仅一次，实测约 1 分钟）；可配 `pipIndexUrl` 用镜像。离线环境可把 ddddocr 的 wheel 放进 `vendor/wheels`（存在则优先离线安装），或登录时用 `code` 手工喂一次。
 - 内置 wheel 不含 **pywin32**（体积大且按 Python 版本区分）：DPAPI 凭证加密有 **ctypes 兜底**、`.lnk` 读写有 **PowerShell COM 兜底**；若某些 Windows 环境仍报 win32 相关错误，可 `pip install pywin32` 或配置已有 emcli。
 - 内置 `psutil` wheel 为 **Windows x64**；Windows arm64 请自备，或让插件回退本机已装 emcli。
 - GUI DOM 仅 7.2.6 验证；7.1.4 先跑 `emobile_compat`。
