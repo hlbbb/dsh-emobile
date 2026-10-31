@@ -27,7 +27,7 @@ test('所有 Tool 规格结构合法且名称唯一', () => {
     names.add(spec.name)
     assert.equal(typeof spec.description, 'string')
     assert.ok(spec.description.length > 10)
-    assert.ok(['read', 'send', 'diagnose', 'control'].includes(spec.kind))
+    assert.ok(['read', 'send', 'diagnose'].includes(spec.kind))
     assert.equal(typeof spec.build, 'function')
     for (const [key, prop] of Object.entries(spec.parameters || {})) {
       assert.ok(ALLOWED_TYPES.has(prop.type), `${spec.name}.${key} 类型非法: ${prop.type}`)
@@ -47,32 +47,6 @@ test('读/写工具划分正确：发送类 3 个，且全部要求 confirm', ()
   for (const spec of send) {
     assert.equal(spec.parameters.confirm?.type, 'boolean')
   }
-})
-
-test('自愈/控制类工具存在：setup / login / token_refresh', () => {
-  const control = TOOL_SPECS.filter((s) => s.kind === 'control').map((s) => s.name).sort()
-  assert.deepEqual(control, ['emobile_login', 'emobile_setup', 'emobile_token_refresh'])
-})
-
-test('setup/login/token_refresh 参数拼装', () => {
-  assert.deepEqual(
-    TOOL_SPEC_BY_NAME.emobile_setup.build({ noLauncher: true, waitLogin: 30 }),
-    { argv: ['setup', '--no-launcher', '--wait-login', '30'] },
-  )
-  assert.deepEqual(
-    TOOL_SPEC_BY_NAME.emobile_login.build({ force: true, code: 'AB12', attempts: 6 }),
-    { argv: ['login', '--force', '--code', 'AB12', '--attempts', '6'] },
-  )
-  assert.deepEqual(
-    TOOL_SPEC_BY_NAME.emobile_token_refresh.build({ force: true }),
-    { argv: ['token', 'refresh', '--force'] },
-  )
-})
-
-test('gateSpec：allowControl=false 时拒绝控制类', () => {
-  const spec = TOOL_SPEC_BY_NAME.emobile_login
-  assert.match(gateSpec(spec, {}, { allowControl: false }), /控制类操作已禁用/)
-  assert.equal(gateSpec(spec, {}, { allowControl: true }), null)
 })
 
 test('gateSpec：默认禁止发送', () => {

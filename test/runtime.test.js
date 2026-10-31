@@ -24,45 +24,6 @@ test('随包内置 emcli 源码与 wheels 存在', () => {
   for (const need of ['click', 'requests', 'websocket', 'psutil', 'certifi', 'urllib3']) {
     assert.ok(wheels.some((w) => w.toLowerCase().includes(need)), `缺少 wheel: ${need}`)
   }
-  // OCR 走在线按版本安装，主包不再内置 ddddocr 大依赖
-  assert.equal(wheels.some((w) => /^ddddocr-/i.test(w)), false)
-  assert.equal(fs.existsSync(vendorPaths(PLUGIN_ROOT).requirementsOcr), true)
-})
-
-test('ensureOcrInstalled：先导入失败→离线装 ddddocr→成功', async () => {
-  const { ensureOcrInstalled } = await import('../lib/runtime.js')
-  const libsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-emobile-ocr-'))
-  const calls = []
-  const runProcessImpl = async (command, args, opts = {}) => {
-    calls.push(args.join(' '))
-    const joined = args.join(' ')
-    if (args.includes('pip')) return { code: 0, stdout: 'Successfully installed', stderr: '' }
-    if (joined.includes('import ddddocr')) {
-      const pipDone = calls.some((c) => c.includes('pip'))
-      return pipDone ? { code: 0, stdout: 'ok', stderr: '' } : { code: 1, stdout: '', stderr: 'No module named ddddocr' }
-    }
-    return { code: 1, stdout: '', stderr: 'no' }
-  }
-  const spec = {
-    command: 'C:/fake/python.exe',
-    args: ['-m', 'cli_anything_e_mobile'],
-    env: { PATH: '', PYTHONPATH: 'x' },
-    source: 'bundled:test',
-  }
-  const result = await ensureOcrInstalled({
-    spec,
-    pluginRoot: PLUGIN_ROOT,
-    libsDir,
-    env: { PATH: '' },
-    runProcessImpl,
-    config: {},
-  })
-  assert.equal(result.ok, true)
-  const pipCalls = calls.filter((c) => c.includes('pip'))
-  assert.equal(pipCalls.length, 1)
-  // 无内置 OCR wheel 时应走在线安装（不带 --no-index），按本地 Python 解析版本
-  assert.ok(pipCalls[0].includes('ddddocr'))
-  assert.equal(pipCalls[0].includes('--no-index'), false)
 })
 
 test('runtimeLibsDir 默认落在 DSH_HOME 下，可被配置覆盖', () => {
