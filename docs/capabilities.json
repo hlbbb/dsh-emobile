@@ -113,6 +113,9 @@
     {"tool": "emobile_send_text", "command": "--json chat send-gui --yes --text-file", "kind": "write-restricted"},
     {"tool": "emobile_send_file", "command": "--json chat send-file --yes", "kind": "write-restricted"},
     {"tool": "emobile_send_image", "command": "--json chat send-image --yes", "kind": "write-restricted"},
-    {"tool": "emobile_policy_show", "command": "--json policy show", "kind": "read"}
+    {"tool": "emobile_policy_show", "command": "--json policy show", "kind": "read"},
+    {"tool": "emobile_setup", "command": "--json setup", "kind": "control"},
+    {"tool": "emobile_login", "command": "--json login", "kind": "control"},
+    {"tool": "emobile_token_refresh", "command": "--json token refresh", "kind": "control"}
   ]
 }
