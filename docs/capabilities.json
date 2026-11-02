@@ -78,7 +78,6 @@
   "dependencies": {
     "required": ["click>=8.0", "requests>=2.28", "websocket-client>=1.6"],
     "windows_required": ["psutil>=5.9", "pywin32>=306"],
-    "optional": ["ddddocr>=1.4 (验证码识别)"],
     "dev": ["pytest>=7"]
   },
   "safety": {
@@ -115,7 +114,10 @@
     {"tool": "emobile_send_image", "command": "--json chat send-image --yes", "kind": "write-restricted"},
     {"tool": "emobile_policy_show", "command": "--json policy show", "kind": "read"},
     {"tool": "emobile_setup", "command": "--json setup", "kind": "control"},
-    {"tool": "emobile_login", "command": "--json login", "kind": "control"},
-    {"tool": "emobile_token_refresh", "command": "--json token refresh", "kind": "control"}
+    {"tool": "emobile_token_refresh", "command": "--json token refresh", "kind": "control"},
+    {"tool": "emobile_logout", "command": "--json token clear", "kind": "control"},
+    {"tool": "emobile_launcher_show", "command": "--json launcher show", "kind": "read"},
+    {"tool": "emobile_launcher_install", "command": "--json launcher install", "kind": "control"},
+    {"tool": "emobile_launcher_remove", "command": "--json launcher remove", "kind": "control"}
   ]
 }

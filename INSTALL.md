@@ -26,7 +26,6 @@ node tools\install-to-profile.mjs             # 正式安装
 
 脚本只做三件事（幂等、不删除任何文件）：建 `node_modules` junction、写 profile `package.json`（link 依赖 + bundles）、写 `cordis.patch.yml` 的 `- id: dsh-emobile` 配置块。
 
-安装时还会**按本机 PATH 找到的 Python 自动安装 ddddocr**（验证码 OCR，约 150MB，需联网；用 `--no-ocr` 可跳过，首次登录仍会自动装）。
 
 > **一般无需任何路径参数**：Python 与依赖目录运行时自动探测。
 > 仅当目标机有多个 Python、想指定某个 Anaconda 环境时才需要：
@@ -47,9 +46,9 @@ node tools\install-to-profile.mjs             # 正式安装
 
 首次调用可能多花几秒~几十秒（仅一次）；之后有缓存，直接可用。
 
-**自动登录（emobile_login）** 首次会在目标机上按本地 Python 版本在线安装验证码 OCR（`ddddocr`，约 150MB、约 1 分钟，需能访问 PyPI；可用 `pipIndexUrl` 配镜像）。离线环境可把 ddddocr 及依赖 wheel 放进 `vendor/wheels`（存在则优先离线安装），或在登录时用 `code` 手工喂验证码。
+**登录**：插件不提供自动登录。首次或会话失效时，先调用 `emobile_setup`（自动打开调试端口，必要时重启客户端），然后**用户自己在 E-Mobile 客户端输入账号密码登录**；用 `emobile_login_status` 确认已登录后即可收发。
 
-> 注意：发送/自动登录要求 E-Mobile 能带 `--remote-debugging-port=9333` 启动。**推荐安装后执行一次** `emobile_launcher_install`（或 `emcli launcher install`）创建 `E-Mobile (CLI).lnk`，以后用该图标启动客户端即可；插件不会自动重启/登出。若客户端已在运行且没开端口、当前权限又无法结束它，需要一次性手动退出（或用 CLI 快捷方式启动）。
+> 注意：发送/打开端口要求 E-Mobile 能带 `--remote-debugging-port=9333` 启动。**推荐安装后执行一次** `emobile_launcher_install`（或 `emcli launcher install`）创建 `E-Mobile (CLI).lnk`，以后用该图标启动客户端即可；插件不会自动登录/登出。`emobile_setup` 会在需要时打开端口（必要时重启客户端），登录由用户手动完成。
 
 验证：
 
@@ -80,10 +79,8 @@ node tools\install-to-profile.mjs --doctor
 | 安装器提示 junction 冲突 | 目标已存在且指向别处 | 把该链接**改名**（勿删）后重跑 |
 | 插件不出现 | 桌面端没完全重启 / profile 未初始化 | 完全退出重开 |
 | 发送 blocked | 目标群不在白名单 | 人工 `emcli policy add` 后重试 |
-| `emobile_login` 报“客户端仍在运行/无法结束” | 客户端无调试端口且权限不足 | 完全退出 E-Mobile（管理员任务管理器）或用 `E-Mobile (CLI).lnk` 启动 |
-| 首次登录很慢 | 正在联网安装 ddddocr | 正常（约 1 分钟，仅一次）；可调 `ocrTimeoutMs` 或用镜像 |
-| OCR 安装失败 | 无法访问 PyPI | 配 `pipIndexUrl` 镜像，或把 OCR wheel 放进 `vendor/wheels`，或传 `code` 手工验证码 |
-| 需要客户端自动登录验证码 | 内置 wheel 未含 ddddocr | 目标机 `pip install dddocr`，或配置已有 emcli |
+| `emobile_setup` 报“客户端仍在运行/无法结束” | 客户端无调试端口且权限不足 | 完全退出 E-Mobile（管理员任务管理器）或用 `E-Mobile (CLI).lnk` 启动 |
+| 发送报未登录/42001 | 需要在客户端手动登录 | 用户在 E-Mobile 客户端输入账号密码登录，再用 `emobile_login_status` 确认 |
 | 提示 win32/COM 相关错误 | 内置 wheel 未含 pywin32 | DPAPI 有 ctypes 兜底、.lnk 有 PowerShell 兜底；仍异常则 `pip install pywin32` 或配置已有 emcli |
 | Windows arm64 装 psutil 失败 | 内置 psutil 仅 x64 | 自备 arm64 psutil，或配置已有 emcli / pythonPath |
 

@@ -54,7 +54,6 @@ test('自愈/控制类工具存在：setup / login / token_refresh', () => {
   assert.deepEqual(control, [
     'emobile_launcher_install',
     'emobile_launcher_remove',
-    'emobile_login',
     'emobile_logout',
     'emobile_setup',
     'emobile_token_refresh',
@@ -67,17 +66,13 @@ test('setup/login/token_refresh 参数拼装', () => {
     { argv: ['setup', '--no-launcher', '--wait-login', '30'] },
   )
   assert.deepEqual(
-    TOOL_SPEC_BY_NAME.emobile_login.build({ force: true, code: 'AB12', attempts: 6 }),
-    { argv: ['login', '--force', '--code', 'AB12', '--attempts', '6'] },
-  )
-  assert.deepEqual(
     TOOL_SPEC_BY_NAME.emobile_token_refresh.build({ force: true }),
     { argv: ['token', 'refresh', '--force'] },
   )
 })
 
 test('gateSpec：allowControl=false 时拒绝控制类', () => {
-  const spec = TOOL_SPEC_BY_NAME.emobile_login
+  const spec = TOOL_SPEC_BY_NAME.emobile_setup
   assert.match(gateSpec(spec, {}, { allowControl: false }), /控制类操作已禁用/)
   assert.equal(gateSpec(spec, {}, { allowControl: true }), null)
 })

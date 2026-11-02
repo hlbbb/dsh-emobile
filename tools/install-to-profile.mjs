@@ -23,7 +23,7 @@ const DEFAULT_SOURCE = path.resolve(HERE, '..')
 const PACKAGE_NAME = 'dsh-emobile'
 
 function parseArgs(argv) {
-  const out = { source: DEFAULT_SOURCE, dshHome: '', profile: 'desktop', emcliPath: '', pythonPath: '', dryRun: false, doctor: false, noOcr: false, help: false }
+  const out = { source: DEFAULT_SOURCE, dshHome: '', profile: 'desktop', emcliPath: '', pythonPath: '', dryRun: false, doctor: false, help: false }
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i]
     const take = () => argv[++i]
@@ -33,7 +33,6 @@ function parseArgs(argv) {
     else if (a === '--emcli-path') out.emcliPath = take()
     else if (a === '--python-path') out.pythonPath = take()
     else if (a === '--dry-run') out.dryRun = true
-    else if (a === '--no-ocr') out.noOcr = true
     else if (a === '--doctor') out.doctor = true
     else if (a === '--help' || a === '-h') out.help = true
     else throw new Error(`未知参数: ${a}`)
@@ -49,7 +48,6 @@ function usage() {
   --emcli-path <绝对路径>   emcli.exe 路径（写入配置；Anaconda 环境可显式给）
   --python-path <绝对路径>  解释器路径（写入配置，用于 python -m）
   --dry-run                 只报告，不写盘
-  --no-ocr                  不预装验证码 OCR（ddddocr）；默认安装时按本机 PATH 的 Python 自动安装
   --doctor                  只读体检
   --help                    显示帮助`)
 }
@@ -251,34 +249,6 @@ async function doctor(config, { source, profileDir }) {
   return allOk
 }
 
-/**
- * 安装时按本机 PATH/常见目录找到的 Python 预装 ddddocr（离线包不存在时在线装）。
- * 失败不阻塞安装：首次 emobile_login 还会自动重试。
- */
-async function installOcrAtInstallTime({ source, dshHome }) {
-  try {
-    const rt = await import('../lib/runtime.js')
-    const libsDir = rt.runtimeLibsDir({ dshHome, config: {} })
-    const candidates = rt.pythonCandidates({ config: {}, env: process.env })
-    if (!candidates.length) {
-      console.log('- OCR: 跳过（PATH/常见目录未找到 Python，可稍后由 emobile_login 自动安装）')
-      return
-    }
-    const py = candidates[0]
-    console.log(`- OCR: 使用 ${py.command}（${py.source}）安装 ddddocr 到 ${libsDir}（首次约 1–3 分钟）…`)
-    const res = await rt.ensureOcrInstalled({
-      spec: { command: py.command, args: ['-m', 'cli_anything_e_mobile'], source: `installer:${py.source}` },
-      pluginRoot: source,
-      libsDir,
-      env: process.env,
-      config: {},
-    })
-    console.log(`- OCR: ${res.ok ? '完成' : `失败（可稍后由 emobile_login 重试）：${(res.error || '').slice(0, 200)}`}`)
-  } catch (error) {
-    console.log(`- OCR: 跳过（${String(error?.message || error).slice(0, 200)}）`)
-  }
-}
-
 async function main() {
   let args
   try {
@@ -313,11 +283,6 @@ async function main() {
   console.log(`- package.json: ${pkg.changed ? (args.dryRun ? '将更新' : '已更新') : '无变化'}`)
   const patch = upsertPatch(profileDir, config, { dryRun: args.dryRun })
   console.log(`- cordis.patch.yml: ${patch.changed ? (args.dryRun ? '将更新' : '已更新') : '无变化'}`)
-  if (!args.dryRun && !args.noOcr) {
-    await installOcrAtInstallTime({ source, dshHome })
-  } else if (args.noOcr) {
-    console.log('- OCR: 已跳过（--no-ocr）；首次 emobile_login 时仍会自动安装')
-  }
   console.log('')
   console.log('完成。请**完全退出并重开 DSH 桌面端**（不是关窗口）后生效。')
   if (!args.emcliPath && !args.pythonPath) {
