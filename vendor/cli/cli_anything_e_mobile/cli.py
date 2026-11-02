@@ -1720,7 +1720,7 @@ def chat_send_image(ctx: Ctx, conversation: str, file_path: str, yes: bool,
                 gui.assert_conversation(name)
             else:
                 out.info(f"正在打开会话「{name}」...")
-            result = gui.send_image(path, name)
+            result = gui.send_image(path, name, timeout_s=wait_s)
             sent = {"ok": True,
                     "to": _conv_brief(conv, _lookup_conversation_name(ctx, chat_id)),
                     "image": result["fileName"], "fileSize": result["fileSize"],

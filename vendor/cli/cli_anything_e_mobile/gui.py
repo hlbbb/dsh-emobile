@@ -476,7 +476,7 @@ class GuiClient:
             self._call("Input.dispatchMouseEvent",
                        {"type": mtype, "x": x, "y": y,
                         "button": "left", "clickCount": 1})
-        time.sleep(0.25)
+        time.sleep(0.12)
 
     # ---- 文本 ---- #
     def send_text(self, text: str, expect_title: Optional[str] = None) -> None:
@@ -529,8 +529,8 @@ class GuiClient:
                 f"(写入方式={state.get('via')}): {state.get('echoed')!r}"
                 f" != {state.get('expected')!r}")
         self.click_send()
-        for _ in range(10):
-            time.sleep(0.7)
+        for _ in range(45):
+            time.sleep(0.15)
             st = self.editor_state()
             if st["textLen"] == 0 and not st["hasBlot"]:
                 return
@@ -590,8 +590,8 @@ class GuiClient:
             raise GUIError("拖放后输入框里没有文件,应用可能未接受该文件")
 
         self.click_send()
-        for _ in range(12):
-            time.sleep(0.8)
+        for _ in range(60):
+            time.sleep(0.2)
             st = self.editor_state()
             if not st["hasBlot"] and st["textLen"] == 0:
                 break
@@ -644,45 +644,64 @@ class GuiClient:
         with open(path, "rb") as fh:
             payload = base64.b64encode(fh.read()).decode("ascii")
         sel = self._editor_selector()
+        basename = os.path.basename(path)
 
-        # 编辑器容器内已有就绪的 input.ql-image(如同会话刚发过一张)就直接填
-        result = self.eval_json(_IMAGE_FILL_JS % (
-            json.dumps(sel),
-            json.dumps(payload),
-            json.dumps(os.path.basename(path)),
-        ))
-        if not result.get("ok"):
-            # 常态:input.ql-image 不存在 → 先真实点击工具栏「图片」按钮创建它
-            self._click_toolbar_image_button()
-            self._wait_editor_image_input(sel)
+        # 前端拦截系统「打开」框(Chromium69 无 CDP 拦截能力),发送结束/异常都恢复原型
+        suppress = bool(self.eval_json(_SUPPRESS_FILE_CLICK_JS).get("ok"))
+        try:
             result = self.eval_json(_IMAGE_FILL_JS % (
                 json.dumps(sel),
                 json.dumps(payload),
-                json.dumps(os.path.basename(path)),
+                json.dumps(basename),
             ))
-        if not result.get("ok"):
-            raise GUIError(
-                "图片未能放进输入框(只认编辑器容器内的 input.ql-image,"
-                "不会去填群头像上传器;客户端可能不支持图片消息): "
-                + json.dumps(result, ensure_ascii=False))
+            if not result.get("ok"):
+                # 常态:input.ql-image 不存在 → 先真实点击工具栏「图片」按钮创建它
+                self._click_toolbar_image_button()
+                self._wait_editor_image_input(sel)
+                result = self.eval_json(_IMAGE_FILL_JS % (
+                    json.dumps(sel),
+                    json.dumps(payload),
+                    json.dumps(basename),
+                ))
+            if not result.get("ok"):
+                raise GUIError(
+                    "图片未能放进输入框(只认编辑器容器内的 input.ql-image,"
+                    "不会去填群头像上传器;客户端可能不支持图片消息): "
+                    + json.dumps(result, ensure_ascii=False))
 
-        self._log(f"图片已写入输入框({result.get('route')}),"
-                  f"等待就绪 {os.path.basename(path)} ({size/1024/1024:.2f} MB)")
-        if not self._wait_image_staged(sel, timeout_s):
-            raise GUIError(
-                "图片写入后未在输入框就绪,已取消发送(避免发出空消息)")
+            self._log(f"图片已写入输入框({result.get('route')}),"
+                      f"等待就绪 {basename} ({size/1024/1024:.2f} MB)")
+            if not self._wait_image_staged(sel, timeout_s):
+                raise GUIError(
+                    "图片写入后未在输入框就绪,已取消发送(避免发出空消息)")
 
-        self.click_send()
-        for _ in range(30):
-            time.sleep(0.8)
-            st = self.editor_state()
-            if st["textLen"] == 0 and not st["hasBlot"] and not st["uploading"]:
-                break
-        else:
-            raise GUIError("点了发送但输入框未清空")
+            self.click_send()
+            # 图片的 hasBlot 不认 .oli-image,故额外确认编辑器里的 <img> 已消失,
+            # 且先给客户端 0.5s 把图片 blot 移出编辑器,避免"刚清空就误报成功"。
+            time.sleep(0.5)
+            deadline = time.time() + max(5.0, float(timeout_s))
+            while time.time() < deadline:
+                st = self.editor_state()
+                has_img = bool(self.eval_json(
+                    "(() => { const ed = document.querySelector(%s);"
+                    " return {img: !!(ed && ed.querySelector('img.oli-image, img'))}; })()"
+                    % json.dumps(sel)).get("img"))
+                if (st["textLen"] == 0 and not st["hasBlot"]
+                        and not st["uploading"] and not has_img):
+                    break
+                time.sleep(0.2)
+            else:
+                raise GUIError("点了发送但输入框未清空")
 
-        return {"fileName": os.path.basename(path), "fileSize": size,
-                "route": result.get("route"), "staged": True}
+            return {"fileName": basename, "fileSize": size,
+                    "route": result.get("route"), "staged": True}
+        finally:
+            if suppress:
+                try:
+                    self.eval_json(_RESTORE_FILE_CLICK_JS)
+                except Exception:  # noqa: BLE001
+                    # 页面重载/ws 断开时恢复可能失败,不能掩盖原始异常
+                    pass
 
     def _click_toolbar_image_button(self) -> None:
         """CDP 真实点击聊天工具栏「图片」按钮,让客户端创建 input.ql-image。
@@ -708,13 +727,16 @@ class GuiClient:
                         "button": "left", "clickCount": 1})
 
     def _wait_editor_image_input(self, sel: str, timeout_s: float = 5.0,
-                                 interval_s: float = 0.4) -> None:
+                                 interval_s: float = 0.15) -> None:
         """等「图片」按钮点击后在编辑器容器内创建出 input.ql-image。"""
         deadline = time.time() + timeout_s
         while time.time() < deadline:
             if self.eval_json(_HAS_IMAGE_INPUT_JS % json.dumps(sel)).get("ok"):
                 return
             time.sleep(interval_s)
+        raise GUIError(
+            f"等待图片输入框 input.ql-image 超时({timeout_s:g}s):"
+            "点击「图片」按钮后客户端未创建可用的图片输入框")
 
     def _wait_image_staged(self, sel: str, timeout_s: int = 60) -> bool:
         """等图片真正进编辑器。
@@ -732,7 +754,7 @@ class GuiClient:
             ).get("img"))
             if has_img or st.get("hasBlot") or st.get("uploading"):
                 return True
-            time.sleep(0.8)
+            time.sleep(0.3)
         return False
 
     def open_conversation(self, name: str, timeout_s: int = 20) -> None:
@@ -764,7 +786,7 @@ class GuiClient:
 
         deadline = time.time() + timeout_s
         while time.time() < deadline:
-            time.sleep(0.8)
+            time.sleep(0.2)
             if self.is_in_conversation(name):
                 return
         raise GUIError(f"点击后 {timeout_s}s 内未能打开会话「{name}」"
@@ -913,6 +935,49 @@ _HAS_IMAGE_INPUT_JS = r"""
   if (!cont) return {ok: false, err: 'no editor container'};
   return {ok: !!cont.querySelector('input.ql-image'),
           count: cont.querySelectorAll('input.ql-image').length};
+})()
+"""
+
+#: 发送图片前:吞掉 input.ql-image 的 .click(),阻止 Chromium 弹出系统「打开」框。
+#: Chromium 69 / Electron 4.2 没有 Page.setInterceptFileChooserDialog(M77 才有),
+#: 只能在前端拦截:覆盖原型 click 后,按钮 handler 仍会 append input.ql-image,
+#: 只是它的 .click() 被吞,不会弹原生窗口;随后用 DataTransfer 注入图片。
+_SUPPRESS_FILE_CLICK_JS = r"""
+(() => {
+  try {
+    const proto = window.HTMLInputElement && window.HTMLInputElement.prototype;
+    if (!proto || !proto.click) return {ok: false, err: 'no input.click'};
+    if (window.__emcliSuppressQlImageClick) return {ok: true, already: true};
+    const orig = proto.click;
+    proto.click = function () {
+      try {
+        if (this && this.type === 'file' &&
+            this.classList && this.classList.contains('ql-image')) {
+          return;   // 吞掉原生文件框;元素仍在,后续用 DataTransfer 注入
+        }
+      } catch (e) { /* ignore */ }
+      return orig.apply(this, arguments);
+    };
+    window.__emcliSuppressQlImageClick = { orig: orig, proto: proto };
+    return {ok: true};
+  } catch (e) {
+    return {ok: false, err: String(e)};
+  }
+})()
+"""
+
+#: 恢复被 _SUPPRESS_FILE_CLICK_JS 覆盖的 HTMLInputElement.prototype.click。
+_RESTORE_FILE_CLICK_JS = r"""
+(() => {
+  try {
+    const s = window.__emcliSuppressQlImageClick;
+    if (!s) return {ok: true, already: true};
+    try { s.proto.click = s.orig; } catch (e) { /* ignore */ }
+    try { delete window.__emcliSuppressQlImageClick; } catch (e) { /* ignore */ }
+    return {ok: true};
+  } catch (e) {
+    return {ok: false, err: String(e)};
+  }
 })()
 """
 
