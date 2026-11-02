@@ -51,6 +51,7 @@ DSH 插件 (host)
 | `emcliPath` | `''` | 可选：已有 emcli.exe 绝对路径（最高优先级） |
 | `pythonPath` | `''` | 可选：已有 Python 解释器绝对路径（Anaconda 亦可） |
 | `allowSend` | `false` | 是否允许发送类工具 |
+| `allowRestart` | `false` | 是否允许 emcli 自动重启/强杀客户端；默认 false（绝不重启/登出） |
 | `requestTimeoutMs` | `60000` | 只读类超时 |
 | `sendTimeoutMs` | `600000` | 发送类超时 |
 | `probeTimeoutMs` | `15000` | 探测超时 |
@@ -59,6 +60,8 @@ DSH 插件 (host)
 ## 安全
 
 - 发送默认关闭；即使开启也需调用参数 `confirm: true`；插件**绝不自动** `policy add`。
+- 插件**绝不自动重启/登出/登录客户端**：所有调用强制 `EMCLI_NO_RESTART=1`、`EMCLI_NO_FORCE=1`；没有调试端口时发送会明确报错，不会动客户端。
+- 读能力（会话/历史/搜人/群/必达/状态）在 OA 正常登录运行时即可用，**不需要调试端口**；发送类（文本/文件/图片）目前仍需客户端已带 `--remote-debugging-port=9333` 启动（用户手动用 CLI 快捷方式启动，插件不代做）。
 - 拒绝执行 `.cmd/.bat`（避免 shell 注入，群名/正文含 `&` 也安全）。
 - 脱敏沿用 emcli：token/工号掩码；会话 id 作为操作入口原样返回。
 
@@ -79,7 +82,7 @@ node tools\install-to-profile.mjs --doctor
 
 ## 已知限制
 
-- 发送类需 E-Mobile 客户端图形界面登录态 + 调试端口（emcli 会自动兜底）。
+- 发送类需 E-Mobile 客户端图形界面登录态 + 调试端口；插件不会自动重启/登录，端口未开时会直接报错。
 - 内置 wheel 不含验证码 OCR（ddddocr 体积大）；如需要客户端自动登录，可在目标机 `pip install dddocr` 或配置已有 emcli。
 - 内置 wheel 不含 **pywin32**（体积大且按 Python 版本区分）：DPAPI 凭证加密有 **ctypes 兜底**、`.lnk` 读写有 **PowerShell COM 兜底**；若某些 Windows 环境仍报 win32 相关错误，可 `pip install pywin32` 或配置已有 emcli。
 - 内置 `psutil` wheel 为 **Windows x64**；Windows arm64 请自备，或让插件回退本机已装 emcli。

@@ -8,8 +8,9 @@ function probeStub(map) {
 }
 
 /** 假 spawn：返回一个带 stdout/stderr 的 EventEmitter 子进程。 */
-function fakeSpawn({ stdout = '', stderr = '', code = 0 } = {}) {
-  return () => {
+function fakeSpawn({ stdout = '', stderr = '', code = 0, seen = null } = {}) {
+  return (_cmd, _args, opts = {}) => {
+    if (seen) seen.push(opts)
     const child = new EventEmitter()
     child.stdout = new EventEmitter()
     child.stderr = new EventEmitter()
@@ -48,9 +49,13 @@ test('client.run：解析后以 --json 执行并解析结果', async () => {
     platform: 'win32',
     runProcessImpl: probeStub({ good: { code: 0, stdout: 'v1.0.0', stderr: '' } }),
   })
+  const seen = []
   const res = await client.run(['policy', 'show'], {
-    spawnImpl: fakeSpawn({ stdout: '{"ok":true,"count":1,"allowlist":["x"]}', code: 0 }),
+    spawnImpl: fakeSpawn({ stdout: '{"ok":true,"count":1,"allowlist":["x"]}', code: 0, seen }),
   })
   assert.equal(res.ok, true)
   assert.equal(res.data.count, 1)
+  // 默认绝不重启/强杀客户端
+  assert.equal(seen[0].env.EMCLI_NO_RESTART, '1')
+  assert.equal(seen[0].env.EMCLI_NO_FORCE, '1')
 })

@@ -62,6 +62,8 @@ node tools\install-to-profile.mjs --doctor
 
 ## 五、发送能力（默认关闭）
 
+> 插件**不会自动重启/登录/登出客户端**。读能力不需要调试端口；发送类目前需要客户端已带 `--remote-debugging-port=9333` 启动（请手动双击 `E-Mobile (CLI).lnk`，插件不代做）。没有端口时发送会直接报错，不影响你当前 OA 会话。
+
 默认只读。要在 `cordis.patch.yml` 加 `allowSend: true` 并完全重启；发送前仍需**人工**执行
 `emcli policy add "群名"` 授权（插件不会自动加白），调用发送工具时传 `confirm: true`。单聊不可发，仅群。
 
